@@ -6,8 +6,9 @@
   const ARCHIVE_STATE_KEY = 'dniowki.archive-state.v1';
   const ARCHIVE_FILENAME = 'dniowki-archiwum.json';
   const PRE_IMPORT_KEY = 'dniowki.pre-import.v1';
-  const APP_VERSION = '1.2.0';
-  const APP_BUILD = '2026-10-27';
+  const APP_VERSION = '1.3.0';
+  const APP_EDITION = 'administrator';
+  const APP_BUILD = '2026-11-02';
   const MAX_ENTRIES = 20000;
   const KINDS = ['work', 'vacation', 'sick', 'holiday', 'child_sick'];
   const WEEKDAYS = ['NIE', 'PON', 'WT', 'ŚR', 'CZW', 'PT', 'SOB'];
@@ -70,6 +71,55 @@
     const next = new Date(date);
     next.setDate(next.getDate() + count);
     return next;
+  }
+
+  const holidayCache = new Map();
+
+  function easterSunday(year) {
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(year, month - 1, day, 12);
+  }
+
+  // Polskie święta państwowe będące dniami wolnymi od pracy (klucz yyyy-mm-dd -> nazwa).
+  function publicHolidays(year) {
+    if (holidayCache.has(year)) return holidayCache.get(year);
+    const map = {};
+    const add = (date, name) => { map[localDateKey(date)] = name; };
+    const fixed = (month, day, name) => add(new Date(year, month - 1, day, 12), name);
+    const easter = easterSunday(year);
+    fixed(1, 1, 'Nowy Rok');
+    fixed(1, 6, 'Trzech Króli');
+    add(easter, 'Wielkanoc');
+    add(addDays(easter, 1), 'Poniedziałek Wielkanocny');
+    fixed(5, 1, 'Święto Pracy');
+    fixed(5, 3, 'Święto Konstytucji 3 Maja');
+    add(addDays(easter, 49), 'Zielone Świątki');
+    add(addDays(easter, 60), 'Boże Ciało');
+    fixed(8, 15, 'Wniebowzięcie NMP');
+    fixed(11, 1, 'Wszystkich Świętych');
+    fixed(11, 11, 'Święto Niepodległości');
+    if (year >= 2025) fixed(12, 24, 'Wigilia');
+    fixed(12, 25, 'Boże Narodzenie');
+    fixed(12, 26, 'Drugi dzień Świąt');
+    holidayCache.set(year, map);
+    return map;
+  }
+
+  function holidayName(key) {
+    return publicHolidays(Number(key.slice(0, 4)))[key] || '';
   }
 
   function validTime(value) {
@@ -143,6 +193,7 @@
       theme: ['light', 'dark', 'system'].includes(value?.theme) ? value.theme : 'system',
       employeeName: typeof value?.employeeName === 'string' ? value.employeeName.slice(0, 100) : '',
       leaveRequestPlace: typeof value?.leaveRequestPlace === 'string' ? value.leaveRequestPlace.slice(0, 80) : '',
+      workerName: typeof value?.workerName === 'string' ? value.workerName.slice(0, 100) : '',
       workdays
     };
   }
@@ -209,7 +260,7 @@
     const missing = [];
     while (cursor <= todayStart) {
       const key = localDateKey(cursor);
-      if (settings.workdays.includes(cursor.getDay()) && !entries[key]) missing.push(key);
+      if (settings.workdays.includes(cursor.getDay()) && !holidayName(key) && !entries[key]) missing.push(key);
       cursor = addDays(cursor, 1);
     }
     return missing;
@@ -326,10 +377,13 @@
     const days = scheduledDays();
     const start = selectedWeekStart();
     const keys = [];
+    const todayKey = localDateKey(new Date());
     for (let index = 0; index < 7; index += 1) {
       const date = addDays(start, index);
       const key = localDateKey(date);
-      if (days.includes(date.getDay()) && (!entries[key] || entries[key].deleted)) keys.push(key);
+      // Przy włączonym automacie przyszłe dni nie są jeszcze „brakujące”.
+      if (settings.automaticEntries && key > todayKey) continue;
+      if (days.includes(date.getDay()) && !holidayName(key) && (!entries[key] || entries[key].deleted)) keys.push(key);
     }
     return keys;
   }
@@ -364,16 +418,27 @@
       const date = new Date(year, month, day, 12);
       const key = localDateKey(date);
       const entry = entries[key] && !entries[key].deleted ? entries[key] : null;
-      const todayClass = key === todayKey ? ' today' : '';
+      const holiday = holidayName(key);
+      const todayClass = (key === todayKey ? ' today' : '') + (holiday ? ' public' : '');
+      const holidayNote = holiday ? `, święto: ${holiday}` : '';
+      const holidayTitle = holiday ? ` title="${escapeHTML(holiday)}"` : '';
       if (entry) {
-        cells.push(`<button class="calendar-day ${entry.kind}${todayClass}" type="button" data-calendar-key="${key}" aria-label="${day} ${MONTHS[month].toLowerCase()} ${year}: ${KIND_LABELS[entry.kind]}"><span>${day}</span></button>`);
+        cells.push(`<button class="calendar-day ${entry.kind}${todayClass}" type="button" data-calendar-key="${key}"${holidayTitle} aria-label="${day} ${MONTHS[month].toLowerCase()} ${year}: ${KIND_LABELS[entry.kind]}${holidayNote}"><span>${day}</span></button>`);
       } else {
-        cells.push(`<button class="calendar-day empty${todayClass}" type="button" data-calendar-add="${key}" aria-label="Dodaj wpis: ${day} ${MONTHS[month].toLowerCase()} ${year}"><span>${day}</span></button>`);
+        cells.push(`<button class="calendar-day empty${todayClass}" type="button" data-calendar-add="${key}"${holidayTitle} aria-label="Dodaj wpis: ${day} ${MONTHS[month].toLowerCase()} ${year}${holidayNote}"><span>${day}</span></button>`);
       }
     }
 
     while (cells.length % 7) cells.push('<span class="calendar-blank" aria-hidden="true"></span>');
     $('calendarGrid').innerHTML = cells.join('');
+    const monthHolidays = [];
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const key = localDateKey(new Date(year, month, day, 12));
+      const name = holidayName(key);
+      if (name) monthHolidays.push(`<li><strong>${day} ${MONTHS[month].slice(0, 3).toLowerCase()}</strong> ${escapeHTML(name)}</li>`);
+    }
+    $('calendarHolidays').hidden = monthHolidays.length === 0;
+    $('calendarHolidays').innerHTML = monthHolidays.join('');
   }
 
   function openPdfGenerator() {
@@ -485,12 +550,11 @@
     return new Blob(parts, { type: 'application/pdf' });
   }
 
-  async function createAttendancePdf(employeeName, year, month) {
+  async function createAttendancePdf(employeeName, year, month, data = attendancePdfData(year, month)) {
     const canvas = document.createElement('canvas');
     canvas.width = 1654;
     canvas.height = 2339;
     const context = canvas.getContext('2d', { alpha: false });
-    const data = attendancePdfData(year, month);
     const marginX = 70;
     const top = 54;
     const metaRowHeight = 66;
@@ -718,7 +782,9 @@
     for (let day = 1; day <= last; day += 1) {
       const date = new Date(year, month, day, 12);
       if (!days.includes(date.getDay())) continue;
-      const entry = entries[localDateKey(date)];
+      const key = localDateKey(date);
+      if (holidayName(key)) continue;
+      const entry = entries[key];
       if (entry && !entry.deleted && entry.kind !== 'work') continue;
       count += 1;
     }
@@ -1122,6 +1188,80 @@
       submitButton.textContent = previousLabel;
     }
   });
+  // ADMIN-START
+  const workerListDialog = $('workerListDialog');
+
+  function templateAttendanceData(year, month, startTime, hours) {
+    const daysInMonth = new Date(year, month + 1, 0, 12).getDate();
+    let totalHours = 0;
+    const rows = [];
+    for (let day = 1; day <= 31; day += 1) {
+      const available = day <= daysInMonth;
+      const date = available ? new Date(year, month, day, 12) : null;
+      const holiday = date ? holidayName(localDateKey(date)) : '';
+      const weekend = Boolean(date && (date.getDay() === 0 || date.getDay() === 6));
+      const row = { day, start: '', finish: '', hours: '', note: holiday, available, weekend: weekend || Boolean(holiday) };
+      if (available && !weekend && !holiday) {
+        row.start = startTime;
+        row.finish = endTime(hours, 0, startTime);
+        row.hours = formatNumber(hours);
+        totalHours += hours;
+      }
+      rows.push(row);
+    }
+    return { rows, totalHours };
+  }
+
+  $('openWorkerList').addEventListener('click', () => {
+    $('workerName').value = settings.workerName;
+    $('workerMonth').value = `${calendarDate.getFullYear()}-${String(calendarDate.getMonth() + 1).padStart(2, '0')}`;
+    $('workerStart').value = '06:00';
+    $('workerHours').value = 8;
+    $('workerListError').textContent = '';
+    workerListDialog.showModal();
+  });
+  $('closeWorkerList').addEventListener('click', () => workerListDialog.close());
+  $('workerMonth').addEventListener('input', () => $('workerMonth').setCustomValidity(''));
+  $('workerListForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const name = $('workerName').value.trim().replace(/\s+/g, ' ').slice(0, 100);
+    const match = /^(\d{4})-(\d{2})$/.exec($('workerMonth').value);
+    const startTime = validTime($('workerStart').value) ? $('workerStart').value : '06:00';
+    const hours = roundToHalf(Math.max(.5, Math.min(24, Number($('workerHours').value) || 8)));
+    if (!name) {
+      $('workerListError').textContent = 'Wpisz imię i nazwisko pracownika.';
+      $('workerName').focus();
+      return;
+    }
+    if (!match || Number(match[2]) < 1 || Number(match[2]) > 12) {
+      $('workerListError').textContent = 'Wybierz miesiąc w formacie RRRR-MM.';
+      return;
+    }
+    $('workerListError').textContent = '';
+    if (settings.workerName !== name) {
+      settings.workerName = name;
+      saveSettings();
+    }
+    const year = Number(match[1]);
+    const month = Number(match[2]) - 1;
+    const submitButton = event.submitter || $('workerListForm').querySelector('button[type="submit"]');
+    const previousLabel = submitButton.textContent;
+    submitButton.disabled = true;
+    submitButton.textContent = 'Tworzenie PDF…';
+    try {
+      const pdf = await createAttendancePdf(name, year, month, templateAttendanceData(year, month, startTime, hours));
+      const slug = name.replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '-').replace(/\.+$/g, '') || 'pracownik';
+      workerListDialog.close();
+      await shareAttendancePdf(pdf, `lista-obecnosci-${slug}-${year}-${String(month + 1).padStart(2, '0')}.pdf`);
+    } catch {
+      $('workerListError').textContent = 'Nie udało się utworzyć pliku PDF. Spróbuj ponownie.';
+      if (!workerListDialog.open) workerListDialog.showModal();
+    } finally {
+      submitButton.disabled = false;
+      submitButton.textContent = previousLabel;
+    }
+  });
+  // ADMIN-END
   $('previousYear').addEventListener('click', () => { statisticsYear -= 1; renderStatistics(); });
   $('nextYear').addEventListener('click', () => {
     if (statisticsYear < new Date().getFullYear()) { statisticsYear += 1; renderStatistics(); }
@@ -1468,7 +1608,7 @@
   safely(generateMissingWorkdays);
   safely(updateArchiveIndicator);
   safely(render);
-  $('appVersion').textContent = `Dniówki, wersja ${APP_VERSION} (${APP_BUILD}). Aktualizacje pobierają się w tle; przeładowanie następuje po wybraniu „Zaktualizuj”.`;
+  $('appVersion').textContent = `Dniówki, wersja ${APP_VERSION} (${APP_BUILD}), edycja: ${APP_EDITION}. Aktualizacje pobierają się w tle; przeładowanie następuje po wybraniu „Zaktualizuj”.`;
   registerAppUpdates();
   navigator.storage?.persist?.().catch(() => {});
 
