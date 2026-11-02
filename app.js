@@ -6,7 +6,7 @@
   const ARCHIVE_STATE_KEY = 'dniowki.archive-state.v1';
   const ARCHIVE_FILENAME = 'dniowki-archiwum.json';
   const PRE_IMPORT_KEY = 'dniowki.pre-import.v1';
-  const APP_VERSION = '1.3.0';
+  const APP_VERSION = '1.3.1';
   const APP_EDITION = 'administrator';
   const APP_BUILD = '2026-11-02';
   const MAX_ENTRIES = 20000;
@@ -1200,7 +1200,8 @@
       const date = available ? new Date(year, month, day, 12) : null;
       const holiday = date ? holidayName(localDateKey(date)) : '';
       const weekend = Boolean(date && (date.getDay() === 0 || date.getDay() === 6));
-      const row = { day, start: '', finish: '', hours: '', note: holiday, available, weekend: weekend || Boolean(holiday) };
+      // Na liście święta nie są oznaczane (jak w zwykłej liście); dzień świąteczny zostaje pusty.
+      const row = { day, start: '', finish: '', hours: '', note: '', available, weekend };
       if (available && !weekend && !holiday) {
         row.start = startTime;
         row.finish = endTime(hours, 0, startTime);
