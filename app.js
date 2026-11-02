@@ -6,7 +6,7 @@
   const ARCHIVE_STATE_KEY = 'dniowki.archive-state.v1';
   const ARCHIVE_FILENAME = 'dniowki-archiwum.json';
   const PRE_IMPORT_KEY = 'dniowki.pre-import.v1';
-  const APP_VERSION = '1.3.1';
+  const APP_VERSION = '1.4.0';
   const APP_EDITION = 'administrator';
   const APP_BUILD = '2026-11-02';
   const MAX_ENTRIES = 20000;
@@ -377,13 +377,10 @@
     const days = scheduledDays();
     const start = selectedWeekStart();
     const keys = [];
-    const todayKey = localDateKey(new Date());
     for (let index = 0; index < 7; index += 1) {
       const date = addDays(start, index);
       const key = localDateKey(date);
-      // Przy włączonym automacie przyszłe dni nie są jeszcze „brakujące”.
-      if (settings.automaticEntries && key > todayKey) continue;
-      if (days.includes(date.getDay()) && !holidayName(key) && (!entries[key] || entries[key].deleted)) keys.push(key);
+      if (days.includes(date.getDay()) && (!entries[key] || entries[key].deleted)) keys.push(key);
     }
     return keys;
   }
@@ -394,7 +391,9 @@
     $('missingDaysList').innerHTML = missing.map((key) => {
       const date = dateFromKey(key);
       const spoken = new Intl.DateTimeFormat('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' }).format(date);
-      return `<button type="button" data-add-day="${key}" aria-label="Dodaj dzień pracy: ${spoken}">${WEEKDAYS[date.getDay()]} ${date.getDate()}</button>`;
+      const holiday = holidayName(key);
+      const holidayNote = holiday ? `, święto: ${holiday}` : '';
+      return `<button type="button" class="${holiday ? 'holiday' : ''}" data-add-day="${key}" aria-label="Dodaj dzień pracy: ${spoken}${holidayNote}">${WEEKDAYS[date.getDay()]} ${date.getDate()}</button>`;
     }).join('');
   }
 
@@ -1190,52 +1189,147 @@
   });
   // ADMIN-START
   const workerListDialog = $('workerListDialog');
+  const workerDayDialog = $('workerDayDialog');
+  const workerDrafts = {};
+  let workerCursor = { year: 0, month: 0 };
+  let workerEditingDay = 0;
 
-  function templateAttendanceData(year, month, startTime, hours) {
+  // Zasada domyślna: dni robocze (pon.–pt., bez świąt) 6:00–14:00, pozostałe dni puste.
+  function workerDefaultDay(year, month, day) {
+    const date = new Date(year, month, day, 12);
+    const weekday = date.getDay();
+    const working = weekday !== 0 && weekday !== 6 && !holidayName(localDateKey(date));
+    return { kind: working ? 'work' : 'off', start: '06:00', hours: 8 };
+  }
+
+  function workerDay(year, month, day) {
+    return workerDrafts[`${year}-${month}`]?.[day] || workerDefaultDay(year, month, day);
+  }
+
+  function renderWorkerCalendar() {
+    const { year, month } = workerCursor;
+    const daysInMonth = new Date(year, month + 1, 0, 12).getDate();
+    const leadingBlanks = (new Date(year, month, 1, 12).getDay() + 6) % 7;
+    const weekdayFormat = new Intl.DateTimeFormat('pl-PL', { weekday: 'long' });
+    const cells = [];
+    let workDays = 0;
+    let total = 0;
+    for (let index = 0; index < leadingBlanks; index += 1) cells.push('<span class="calendar-blank" aria-hidden="true"></span>');
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = new Date(year, month, day, 12);
+      const holiday = holidayName(localDateKey(date));
+      const entry = workerDay(year, month, day);
+      const kindClass = entry.kind === 'work' ? 'work' : entry.kind === 'vacation' ? 'vacation' : 'empty';
+      let state = 'dzień wolny';
+      if (entry.kind === 'work') {
+        workDays += 1;
+        total += entry.hours;
+        state = `praca ${entry.start}–${endTime(entry.hours, 0, entry.start)}, ${formatNumber(entry.hours)} godz.`;
+      } else if (entry.kind === 'vacation') {
+        state = 'urlop wypoczynkowy';
+      }
+      const spoken = `${day} ${MONTHS[month].toLowerCase()}, ${weekdayFormat.format(date)}: ${state}${holiday ? `, święto: ${holiday}` : ''}`;
+      const title = holiday ? ` title="${escapeHTML(holiday)}"` : '';
+      const hoursMark = entry.kind === 'work' ? `<em class="worker-hours">${formatNumber(entry.hours)}</em>` : '';
+      cells.push(`<button class="calendar-day ${kindClass}${holiday ? ' public' : ''}" type="button" data-worker-day="${day}"${title} aria-label="${escapeHTML(spoken)}"><span>${day}</span>${hoursMark}</button>`);
+    }
+    $('workerMonthLabel').textContent = `${MONTHS[month]} ${year}`;
+    $('workerGrid').innerHTML = cells.join('');
+    $('workerSummary').textContent = `Dni pracy: ${workDays}, razem ${formatNumber(total)} godz. Dotknij dnia, aby go zmienić.`;
+  }
+
+  function workerAttendanceData(year, month) {
     const daysInMonth = new Date(year, month + 1, 0, 12).getDate();
     let totalHours = 0;
     const rows = [];
     for (let day = 1; day <= 31; day += 1) {
       const available = day <= daysInMonth;
       const date = available ? new Date(year, month, day, 12) : null;
-      const holiday = date ? holidayName(localDateKey(date)) : '';
-      const weekend = Boolean(date && (date.getDay() === 0 || date.getDay() === 6));
-      // Na liście święta nie są oznaczane (jak w zwykłej liście); dzień świąteczny zostaje pusty.
-      const row = { day, start: '', finish: '', hours: '', note: '', available, weekend };
-      if (available && !weekend && !holiday) {
-        row.start = startTime;
-        row.finish = endTime(hours, 0, startTime);
-        row.hours = formatNumber(hours);
-        totalHours += hours;
+      const row = { day, start: '', finish: '', hours: '', note: '', available, weekend: Boolean(date && (date.getDay() === 0 || date.getDay() === 6)) };
+      if (available) {
+        const entry = workerDay(year, month, day);
+        if (entry.kind === 'work') {
+          row.start = entry.start;
+          row.finish = endTime(entry.hours, 0, entry.start);
+          row.hours = formatNumber(entry.hours);
+          totalHours += entry.hours;
+        } else if (entry.kind === 'vacation') {
+          row.note = 'Urlop wypoczynkowy';
+        }
       }
       rows.push(row);
     }
     return { rows, totalHours };
   }
 
+  function shiftWorkerMonth(delta) {
+    const target = new Date(workerCursor.year, workerCursor.month + delta, 1, 12);
+    workerCursor = { year: target.getFullYear(), month: target.getMonth() };
+    renderWorkerCalendar();
+  }
+
+  function updateWorkerDayFields() {
+    $('workerDayTimes').hidden = document.querySelector('input[name="workerKind"]:checked').value !== 'work';
+  }
+
   $('openWorkerList').addEventListener('click', () => {
     $('workerName').value = settings.workerName;
-    $('workerMonth').value = `${calendarDate.getFullYear()}-${String(calendarDate.getMonth() + 1).padStart(2, '0')}`;
-    $('workerStart').value = '06:00';
-    $('workerHours').value = 8;
+    workerCursor = { year: calendarDate.getFullYear(), month: calendarDate.getMonth() };
+    Object.keys(workerDrafts).forEach((key) => { delete workerDrafts[key]; });
     $('workerListError').textContent = '';
+    renderWorkerCalendar();
     workerListDialog.showModal();
   });
   $('closeWorkerList').addEventListener('click', () => workerListDialog.close());
-  $('workerMonth').addEventListener('input', () => $('workerMonth').setCustomValidity(''));
+  $('workerPrevMonth').addEventListener('click', () => shiftWorkerMonth(-1));
+  $('workerNextMonth').addEventListener('click', () => shiftWorkerMonth(1));
+  $('workerReset').addEventListener('click', () => {
+    delete workerDrafts[`${workerCursor.year}-${workerCursor.month}`];
+    renderWorkerCalendar();
+  });
+  $('workerName').addEventListener('change', (event) => {
+    const name = event.target.value.trim().replace(/\s+/g, ' ').slice(0, 100);
+    event.target.value = name;
+    if (name && settings.workerName !== name) {
+      settings.workerName = name;
+      saveSettings();
+    }
+  });
+
+  $('workerGrid').addEventListener('click', (event) => {
+    const cell = event.target.closest('[data-worker-day]');
+    if (!cell) return;
+    const { year, month } = workerCursor;
+    workerEditingDay = Number(cell.dataset.workerDay);
+    const entry = workerDay(year, month, workerEditingDay);
+    $('workerDayTitle').textContent = new Intl.DateTimeFormat('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(year, month, workerEditingDay, 12));
+    document.querySelector(`input[name="workerKind"][value="${entry.kind}"]`).checked = true;
+    $('workerDayStart').value = entry.start;
+    $('workerDayHours').value = entry.hours;
+    updateWorkerDayFields();
+    workerDayDialog.showModal();
+  });
+  document.querySelectorAll('input[name="workerKind"]').forEach((input) => input.addEventListener('change', updateWorkerDayFields));
+  $('cancelWorkerDay').addEventListener('click', () => workerDayDialog.close());
+  $('workerDayForm').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const key = `${workerCursor.year}-${workerCursor.month}`;
+    workerDrafts[key] = workerDrafts[key] || {};
+    workerDrafts[key][workerEditingDay] = {
+      kind: document.querySelector('input[name="workerKind"]:checked').value,
+      start: validTime($('workerDayStart').value) ? $('workerDayStart').value : '06:00',
+      hours: roundToHalf(Math.max(.5, Math.min(24, Number($('workerDayHours').value) || 8)))
+    };
+    workerDayDialog.close();
+    renderWorkerCalendar();
+  });
+
   $('workerListForm').addEventListener('submit', async (event) => {
     event.preventDefault();
     const name = $('workerName').value.trim().replace(/\s+/g, ' ').slice(0, 100);
-    const match = /^(\d{4})-(\d{2})$/.exec($('workerMonth').value);
-    const startTime = validTime($('workerStart').value) ? $('workerStart').value : '06:00';
-    const hours = roundToHalf(Math.max(.5, Math.min(24, Number($('workerHours').value) || 8)));
     if (!name) {
       $('workerListError').textContent = 'Wpisz imię i nazwisko pracownika.';
       $('workerName').focus();
-      return;
-    }
-    if (!match || Number(match[2]) < 1 || Number(match[2]) > 12) {
-      $('workerListError').textContent = 'Wybierz miesiąc w formacie RRRR-MM.';
       return;
     }
     $('workerListError').textContent = '';
@@ -1243,20 +1337,17 @@
       settings.workerName = name;
       saveSettings();
     }
-    const year = Number(match[1]);
-    const month = Number(match[2]) - 1;
+    const { year, month } = workerCursor;
     const submitButton = event.submitter || $('workerListForm').querySelector('button[type="submit"]');
     const previousLabel = submitButton.textContent;
     submitButton.disabled = true;
     submitButton.textContent = 'Tworzenie PDF…';
     try {
-      const pdf = await createAttendancePdf(name, year, month, templateAttendanceData(year, month, startTime, hours));
+      const pdf = await createAttendancePdf(name, year, month, workerAttendanceData(year, month));
       const slug = name.replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '-').replace(/\.+$/g, '') || 'pracownik';
-      workerListDialog.close();
       await shareAttendancePdf(pdf, `lista-obecnosci-${slug}-${year}-${String(month + 1).padStart(2, '0')}.pdf`);
     } catch {
       $('workerListError').textContent = 'Nie udało się utworzyć pliku PDF. Spróbuj ponownie.';
-      if (!workerListDialog.open) workerListDialog.showModal();
     } finally {
       submitButton.disabled = false;
       submitButton.textContent = previousLabel;

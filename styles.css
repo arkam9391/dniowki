@@ -593,4 +593,22 @@ button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-
 /* ADMIN-START */
 .pdf-export-button.secondary { margin-top: 10px; border: 1px solid var(--blue); background: var(--blue-soft); color: var(--blue); }
 .pdf-export-button.secondary small { color: var(--muted); }
+.worker-calendar-dialog { max-height: 94dvh; overflow-y: auto; }
+.worker-calendar-dialog form { padding: 16px 14px 18px; }
+.worker-calendar-dialog header { margin-bottom: 12px; }
+.worker-month-nav { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; margin: 10px 0 4px; }
+.worker-month-nav button { min-height: 44px; border: 0; border-radius: 12px; background: transparent; color: var(--blue); font-size: 1.6rem; line-height: 1; cursor: pointer; }
+.worker-month-nav strong { text-align: center; font-size: 1.02rem; }
+.worker-calendar-dialog .calendar-weekdays, .worker-calendar-dialog .calendar-grid { gap: 4px; }
+.worker-calendar-dialog .calendar-weekdays { margin-bottom: 4px; }
+.worker-calendar-dialog .calendar-day { border-radius: 10px; font-size: .8rem; }
+.worker-hours { position: absolute; right: 0; bottom: 2px; left: 0; font-style: normal; font-size: .56rem; font-weight: 800; text-align: center; opacity: .85; }
+.worker-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 10px; margin-top: 4px; }
+.secondary-form-button { min-height: 48px; border: 1px solid var(--line); border-radius: 13px; background: var(--control); color: var(--text); cursor: pointer; font-weight: 700; }
+.worker-kinds { display: grid; gap: 8px; margin: 0 0 12px; padding: 0; border: 0; }
+.worker-kinds label { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--control); font-weight: 700; cursor: pointer; }
+.worker-kinds input { width: 20px; height: 20px; accent-color: var(--blue); }
+.pdf-fields[hidden] { display: none; }
+.pdf-fields + .worker-actions { margin-top: 14px; }
 /* ADMIN-END */
+.missing-days-list button.holiday { border-color: var(--red); background: var(--red-soft); color: var(--red); }

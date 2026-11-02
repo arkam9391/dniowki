@@ -113,7 +113,7 @@
         <!-- ADMIN-START -->
         <button class="pdf-export-button secondary" id="openWorkerList" type="button">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11a3 3 0 1 0-6 0 3 3 0 0 0 6 0zM6 20c0-3 3-5 7-5s7 2 7 5M4 8h3M4 12h2"></path></svg>
-          <span><strong>Lista dla pracownika</strong><small>Wypełniona lista dla wybranej osoby</small></span>
+          <span><strong>Lista dla pracownika</strong><small>Edytowalny kalendarz, domyślnie 6:00–14:00</small></span>
         </button>
         <!-- ADMIN-END -->
       </section>
@@ -452,7 +452,7 @@
   </dialog>
 
   <!-- ADMIN-START -->
-  <dialog class="pdf-dialog leave-request-dialog" id="workerListDialog" aria-labelledby="workerListTitle">
+  <dialog class="pdf-dialog worker-calendar-dialog" id="workerListDialog" aria-labelledby="workerListTitle">
     <form id="workerListForm" novalidate>
       <header>
         <div>
@@ -461,17 +461,51 @@
         </div>
         <button class="close-button" id="closeWorkerList" type="button" aria-label="Zamknij">×</button>
       </header>
-      <div class="pdf-fields leave-request-fields">
+      <div class="pdf-fields">
         <label for="workerName"><span>Imię i nazwisko pracownika</span><input id="workerName" type="text" maxlength="100" autocomplete="off" placeholder="Wpisz imię i nazwisko"></label>
-        <label for="workerMonth"><span>Miesiąc</span><input id="workerMonth" type="month" required></label>
+      </div>
+      <div class="worker-month-nav">
+        <button type="button" id="workerPrevMonth" aria-label="Poprzedni miesiąc">‹</button>
+        <strong id="workerMonthLabel" aria-live="polite"></strong>
+        <button type="button" id="workerNextMonth" aria-label="Następny miesiąc">›</button>
+      </div>
+      <div class="calendar-weekdays" aria-hidden="true">
+        <span>Pon</span><span>Wt</span><span>Śr</span><span>Czw</span><span>Pt</span><span>Sob</span><span>Nie</span>
+      </div>
+      <div class="calendar-grid" id="workerGrid"></div>
+      <p class="pdf-help" id="workerSummary"></p>
+      <p class="form-error" id="workerListError" role="alert"></p>
+      <div class="worker-actions">
+        <button class="secondary-form-button" type="button" id="workerReset">Przywróć domyślne</button>
+        <button class="primary-form-button" type="submit">Utwórz listę obecności</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="pdf-dialog" id="workerDayDialog" aria-labelledby="workerDayTitle">
+    <form id="workerDayForm" novalidate>
+      <header>
+        <div>
+          <p class="dialog-kicker">Dzień na liście</p>
+          <h2 id="workerDayTitle"></h2>
+        </div>
+      </header>
+      <fieldset class="worker-kinds">
+        <legend class="sr-only">Rodzaj dnia</legend>
+        <label><input type="radio" name="workerKind" value="work"><span>Praca</span></label>
+        <label><input type="radio" name="workerKind" value="off"><span>Dzień wolny (puste pola)</span></label>
+        <label><input type="radio" name="workerKind" value="vacation"><span>Urlop wypoczynkowy</span></label>
+      </fieldset>
+      <div class="pdf-fields leave-request-fields" id="workerDayTimes">
         <div class="date-pair">
-          <label for="workerStart"><span>Godzina rozpoczęcia</span><input id="workerStart" type="time" step="900" value="06:00"></label>
-          <label for="workerHours"><span>Liczba godzin</span><input id="workerHours" type="number" min="0.5" max="24" step="0.5" inputmode="decimal" value="8"></label>
+          <label for="workerDayStart"><span>Godzina rozpoczęcia</span><input id="workerDayStart" type="time" step="900" value="06:00"></label>
+          <label for="workerDayHours"><span>Liczba godzin</span><input id="workerDayHours" type="number" min="0.5" max="24" step="0.5" inputmode="decimal" value="8"></label>
         </div>
       </div>
-      <p class="pdf-help">Lista zawiera wszystkie dni robocze miesiąca (poniedziałek–piątek, bez świąt) z godzinami 6:00–14:00. Soboty, niedziele i dni świąteczne zostają puste, a święta nie są na liście oznaczane (widać je w Kalendarzu). Imię i nazwisko zostanie zapamiętane.</p>
-      <p class="form-error" id="workerListError" role="alert"></p>
-      <button class="primary-form-button" type="submit">Utwórz listę obecności</button>
+      <div class="worker-actions">
+        <button class="secondary-form-button" type="button" id="cancelWorkerDay">Anuluj</button>
+        <button class="primary-form-button" type="submit">Zapisz dzień</button>
+      </div>
     </form>
   </dialog>
   <!-- ADMIN-END -->
