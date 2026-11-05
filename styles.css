@@ -604,11 +604,25 @@ button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-
 .worker-calendar-dialog .calendar-day { border-radius: 10px; font-size: .8rem; }
 .worker-hours { position: absolute; right: 0; bottom: 2px; left: 0; font-style: normal; font-size: .56rem; font-weight: 800; text-align: center; opacity: .85; }
 .worker-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 10px; margin-top: 4px; }
-.secondary-form-button { min-height: 48px; border: 1px solid var(--line); border-radius: 13px; background: var(--control); color: var(--text); cursor: pointer; font-weight: 700; }
 .worker-kinds { display: grid; gap: 8px; margin: 0 0 12px; padding: 0; border: 0; }
 .worker-kinds label { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--control); font-weight: 700; cursor: pointer; }
 .worker-kinds input { width: 20px; height: 20px; accent-color: var(--blue); }
-.pdf-fields[hidden] { display: none; }
 .pdf-fields + .worker-actions { margin-top: 14px; }
 /* ADMIN-END */
 .missing-days-list button.holiday { border-color: var(--red); background: var(--red-soft); color: var(--red); }
+/* --- 1.5.0: pula urlopu --- */
+.dialog-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 10px; margin-top: 4px; }
+.dialog-actions [hidden] { display: none; }
+.secondary-form-button { min-height: 48px; border: 1px solid var(--line); border-radius: 13px; background: var(--control); color: var(--text); cursor: pointer; font-weight: 700; }
+.pdf-fields[hidden] { display: none; }
+button.leave-balance { width: 100%; border: 0; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+button.leave-balance:active { transform: scale(.99); }
+.vacation-summary > .leave-balance-copy { display: grid; flex: 1; min-width: 0; gap: 3px; justify-content: stretch; }
+.leave-balance-copy > span { color: var(--muted); font-size: .88rem; }
+.leave-balance-main { display: flex; align-items: baseline; gap: 7px; }
+.leave-balance-main strong { font-size: 2.5rem; letter-spacing: -.04em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.leave-balance-main strong.over { color: var(--red); }
+.leave-balance-main small { color: var(--muted); font-size: .95rem; font-weight: 700; }
+.leave-balance-copy > small { color: var(--muted); font-size: .78rem; line-height: 1.35; }
+.leave-balance-edit { width: 20px; flex: 0 0 auto; align-self: flex-start; fill: none; stroke: var(--muted); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.leave-pool-preview { margin-top: 0; color: var(--text); font-weight: 700; }
