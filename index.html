@@ -107,9 +107,7 @@
           <span><i class="public"></i>Święto – dzień wolny</span>
           <span id="legendFerie" hidden><i class="ferie"></i>Ferie zimowe</span>
         </div>
-        <!-- ADMIN-START -->
-        <button class="secondary-form-button ferie-open" id="openFerie" type="button">Terminy ferii – wszystkie województwa</button>
-        <!-- ADMIN-END -->
+        <button class="secondary-form-button ferie-open" id="openFerie" type="button" hidden>Terminy ferii – wszystkie województwa</button>
         <button class="pdf-export-button" id="openPdfGenerator" type="button">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6zM14 3v4h4M9 12h6M9 16h6"></path></svg>
           <span><strong>Lista obecności PDF</strong><small>Utwórz dokument dla tego miesiąca</small></span>
@@ -651,7 +649,6 @@
   </dialog>
 
 
-  <!-- ADMIN-START -->
   <dialog class="pdf-dialog whats-new-dialog ferie-dialog" id="ferieDialog" aria-labelledby="ferieTitle">
     <div class="whats-new-panel">
       <div class="whats-new-head">
@@ -669,7 +666,6 @@
       </div>
     </div>
   </dialog>
-  <!-- ADMIN-END -->
 
   <dialog class="pdf-dialog whats-new-dialog" id="whatsNewDialog" aria-labelledby="whatsNewTitle">
     <div class="whats-new-panel">

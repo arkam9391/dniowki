@@ -6,7 +6,7 @@
   const ARCHIVE_STATE_KEY = 'dniowki.archive-state.v1';
   const ARCHIVE_FILENAME = 'dniowki-archiwum.json';
   const PRE_IMPORT_KEY = 'dniowki.pre-import.v1';
-  const APP_VERSION = '1.12.0';
+  const APP_VERSION = '1.13.0';
   const APP_EDITION = 'administrator';
   const APP_BUILD = '2026-11-08';
   const MAX_ENTRIES = 20000;
@@ -820,6 +820,7 @@
     });
     $('voivodeship').value = settings.voivodeship;
     $('legendFerie').hidden = !settings.voivodeship;
+    $('openFerie').hidden = !settings.voivodeship;
     $('automaticStatus').classList.toggle('manual', !settings.automaticEntries);
     $('automaticStatus').textContent = settings.automaticEntries && settings.workdays.length
       ? 'Automat jest włączony — w zaznaczone dni aplikacja utworzy wpis po otwarciu.'
@@ -1623,7 +1624,6 @@
     if (settings.automaticEntries) generateMissingWorkdays();
     render();
   });
-  // ADMIN-START
   const ferieDialog = $('ferieDialog');
   let ferieYear = new Date().getFullYear();
   const ferieDateFormat = new Intl.DateTimeFormat('pl-PL', { day: 'numeric', month: 'long' });
@@ -1659,7 +1659,6 @@
   $('feriePrevYear').addEventListener('click', () => { ferieYear -= 1; renderFerie(); });
   $('ferieNextYear').addEventListener('click', () => { ferieYear += 1; renderFerie(); });
   $('closeFerie').addEventListener('click', () => ferieDialog.close());
-  // ADMIN-END
 
   $('voivodeship').addEventListener('change', (event) => {
     settings.voivodeship = Object.prototype.hasOwnProperty.call(VOIVODESHIPS, event.target.value) ? event.target.value : '';
